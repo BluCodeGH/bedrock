@@ -249,10 +249,10 @@ class SubChunk:
 
 # Generic block storage.
 class Block:
-  def __init__(self, name, dv=0, nbt=None):
+  def __init__(self, name, dv=0, nbtData=None):
     self.name = name
     self.dv = dv
-    self.nbt = nbt
+    self.nbt = nbtData
 
   def __repr__(self):
     return "{} {}".format(self.name, self.dv)
@@ -282,4 +282,4 @@ class CommandBlock(Block):
     nbtData.add(nbt.TAG_String("LastOutput", ""))
     nbtData.add(nbt.TAG_List("LastOutputParams", [nbt.TAG_String(n, str(n)) for n in range(3)]))
     nbtData.add(nbt.TAG_Int("SuccessCount", 0))
-    super().__init__(name, dv, nbt)
+    super().__init__(name, dv, nbtData)
