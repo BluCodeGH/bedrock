@@ -97,11 +97,11 @@ class Chunk:
       return
     data = nbt.DataReader(data)
     while not data.finished():
-      nbt = nbt.decode(data)
-      x = nbt.pop("x").payload # We add back theses with the correct value on save, they are important.
-      y = nbt.pop("y").payload
-      z = nbt.pop("z").payload
-      self.getBlock(x % 16, y, z % 16).nbt = nbt
+      nbtData = nbt.decode(data)
+      x = nbtData.pop("x").payload # We add back theses with the correct value on save, they are important.
+      y = nbtData.pop("y").payload
+      z = nbtData.pop("z").payload
+      self.getBlock(x % 16, y, z % 16).nbt = nbtData
 
   def getBlock(self, x, y, z):
     if y // 16 + 1 > len(self.subchunks):
@@ -266,20 +266,20 @@ class CommandBlock(Block):
     dv = self.dMap[d]
     if cond:
       dv += 8
-    nbt = nbt.TAG_Compound("", [])
-    nbt.add(nbt.TAG_String("Command", cmd))
-    nbt.add(nbt.TAG_String("CustomName", hover))
-    nbt.add(nbt.TAG_Byte("TrackOutput", 1))
-    nbt.add(nbt.TAG_Int("Version", 8))
-    nbt.add(nbt.TAG_Byte("auto", int(not redstone)))
-    nbt.add(nbt.TAG_String("id", "CommandBlock"))
-    nbt.add(nbt.TAG_Byte("isMovable", 1))
-    nbt.add(nbt.TAG_Byte("powered", 0))
-    nbt.add(nbt.TAG_Int("LPCommandMode", 0)) # Not sure what these LPModes do. This works.
-    nbt.add(nbt.TAG_Byte("LPConditionalMode", 0))
-    nbt.add(nbt.TAG_Byte("LPRedstoneMode", 0))
-    nbt.add(nbt.TAG_Long("LastExecution", 0))
-    nbt.add(nbt.TAG_String("LastOutput", ""))
-    nbt.add(nbt.TAG_List("LastOutputParams", [nbt.TAG_String(n, str(n)) for n in range(3)]))
-    nbt.add(nbt.TAG_Int("SuccessCount", 0))
+    nbtData = nbt.TAG_Compound("", [])
+    nbtData.add(nbt.TAG_String("Command", cmd))
+    nbtData.add(nbt.TAG_String("CustomName", hover))
+    nbtData.add(nbt.TAG_Byte("TrackOutput", 1))
+    nbtData.add(nbt.TAG_Int("Version", 8))
+    nbtData.add(nbt.TAG_Byte("auto", int(not redstone)))
+    nbtData.add(nbt.TAG_String("id", "CommandBlock"))
+    nbtData.add(nbt.TAG_Byte("isMovable", 1))
+    nbtData.add(nbt.TAG_Byte("powered", 0))
+    nbtData.add(nbt.TAG_Int("LPCommandMode", 0)) # Not sure what these LPModes do. This works.
+    nbtData.add(nbt.TAG_Byte("LPConditionalMode", 0))
+    nbtData.add(nbt.TAG_Byte("LPRedstoneMode", 0))
+    nbtData.add(nbt.TAG_Long("LastExecution", 0))
+    nbtData.add(nbt.TAG_String("LastOutput", ""))
+    nbtData.add(nbt.TAG_List("LastOutputParams", [nbt.TAG_String(n, str(n)) for n in range(3)]))
+    nbtData.add(nbt.TAG_Int("SuccessCount", 0))
     super().__init__(name, dv, nbt)
