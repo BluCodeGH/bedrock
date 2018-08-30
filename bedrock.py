@@ -50,6 +50,9 @@ class World:
     for chunk in self.chunks.values():
       chunk.save(self.db)
 
+  def iterKeys(self, start=None, end=None):
+    yield from ldb.iterate(self.db, start, end)
+
 # Handles biomes and tile entities. Maps blocks to subchunks.
 class Chunk:
   def __init__(self, db, x, z):

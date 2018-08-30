@@ -6,9 +6,9 @@ import sys
 
 if sys.platform == "win32":
   if sys.maxsize > 2**32: # 64 bit python
-    ldb = ctypes.cdll.LoadLibrary(op.join(op.dirname(op.realpath(__file__)), "LevelDB-64.dll"))
+    ldb = ctypes.cdll.LoadLibrary(op.join(op.dirname(op.realpath(__file__)), "LevelDB-MCPE-64.dll"))
   else: # 32 bit python
-    ldb = ctypes.cdll.LoadLibrary(op.join(op.dirname(op.realpath(__file__)), "LevelDB-32.dll"))
+    ldb = ctypes.cdll.LoadLibrary(op.join(op.dirname(op.realpath(__file__)), "LevelDB-MCPE-32.dll"))
 else: #linux, compile your own .so if this errors!
   ldb = ctypes.cdll.LoadLibrary(op.join(op.dirname(op.realpath(__file__)), "libleveldb.so")) # Load DLL
 
@@ -174,6 +174,28 @@ def put(db, key, val):
   ldb.leveldb_put(db, wo, key, len(key), val, len(val), ctypes.byref(error))
   ldb.leveldb_writeoptions_destroy(wo)
   _checkError(error)
+
+def iterate(db, start=None, end=None):
+  ro = ldb.leveldb_readoptions_create()
+  it = ldb.leveldb_create_iterator(db, ro)
+  ldb.leveldb_readoptions_destroy(ro)
+  if start is None:
+    ldb.leveldb_iter_seek_to_first(it)
+  else:
+    ldb.leveldb_iter_seek(it, start, len(start))
+  try:
+    while ldb.leveldb_iter_valid(it):
+      size = ctypes.c_size_t(0)
+      keyPtr = ldb.leveldb_iter_key(it, ctypes.byref(size))
+      key = ctypes.string_at(keyPtr, size.value)
+      if end is not None and key >= end:
+        break
+      valPtr = ldb.leveldb_iter_value(it, ctypes.byref(size))
+      val = ctypes.string_at(valPtr, size.value)
+      yield key, val
+      ldb.leveldb_iter_next(it)
+  finally:
+    ldb.leveldb_iter_destroy(it)
 
 def close(db):
   ldb.leveldb_close(db)
