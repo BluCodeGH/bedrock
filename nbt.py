@@ -114,6 +114,22 @@ class TAG_String(TAG):
     data.putString(self.payload)
 tags[8] = TAG_String
 
+# Similar to TAG_List, except the type of tag is not specified, as we know it is a byte.
+class TAG_Byte_Array(TAG):
+  ID = 7
+  def decode(self, data):
+    size = data.pop(4)
+    payload = []
+    for i in range(size):
+      payload.append(TAG_Byte(i, data))
+    return payload
+
+  def encode(self, data):
+    data.put(4, len(self.payload)) # Size
+    for item in self.payload:
+      item.encode(data)
+tags[7] = TAG_Byte_Array
+
 # Basically a TAG_Compound, but the items don't have names, and instead are named integer indexes.
 #  This allows for a generic __getitem__ function in the TAG class.
 class TAG_List(TAG):
