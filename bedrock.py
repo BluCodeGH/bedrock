@@ -132,9 +132,9 @@ class Chunk:
           for z in range(16):
             block = subchunk.getBlock(x, y, z)
             if block.nbt is not None: # Add back the correct position.
-              block.nbt.add(nbt.TAG_Int("x", self.x * 16 + x))
-              block.nbt.add(nbt.TAG_Int("y", y))
-              block.nbt.add(nbt.TAG_Int("z", self.z * 16 + z))
+              block.nbt.add(nbt.TAG_Int("x", subchunk.x * 16 + x))
+              block.nbt.add(nbt.TAG_Int("y", subchunk.y * 16 + y))
+              block.nbt.add(nbt.TAG_Int("z", subchunk.z * 16 + z))
               nbt.encode(block.nbt, data)
     ldb.put(db, self.keyBase + b"1", data.data)
 
