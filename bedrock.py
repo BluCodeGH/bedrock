@@ -114,6 +114,8 @@ class Chunk:
   def setBlock(self, x, y, z, block):
     while y // 16 + 1 > len(self.subchunks):
       self.subchunks.append(SubChunk.empty(self.x, self.z, len(self.subchunks)))
+    if self.subchunks[y // 16] is None:
+      self.subchunks[y // 16] = SubChunk.empty(self.x, self.z, y // 16)
     self.subchunks[y // 16].setBlock(x, y % 16, z, block)
 
   def save(self, db):
