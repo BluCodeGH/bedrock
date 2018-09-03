@@ -39,8 +39,9 @@ class DataWriter:
     self.data += struct.pack(key, *data)
 
   def putString(self, string):
+    string = string.encode("utf-8")
     self.put("h", len(string))
-    self.data += struct.pack("<{}s".format(len(string)), string.encode("utf-8"))
+    self.data += struct.pack("<{}s".format(len(string)), string)
 
   def __repr__(self):
     return str(self.data)
