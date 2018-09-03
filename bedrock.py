@@ -68,9 +68,9 @@ class Chunk:
     for i in range(16):
       try:
         self.subchunks.append(SubChunk(db, self.x, self.z, i)) #Pass off processing to the subchunk class
-      #All the subchunks below an existing subchunk also exist, so we know we have reached the end.
+      #Supposedly if a subchunk exists then all the subchunks below it exist. This is not the case.
       except KeyError:
-        break
+        self.subchunks.append(None)
 
     self._loadTileEntities(db)
 
@@ -121,6 +121,8 @@ class Chunk:
     ldb.put(db, self.keyBase + b"v", version)
     self._save2D(db)
     for subchunk in self.subchunks:
+      if subchunk is None:
+        continue
       subchunk.save(db)
     self._saveTileEntities(db)
 
@@ -130,6 +132,8 @@ class Chunk:
   def _saveTileEntities(self, db):
     data = nbt.DataWriter()
     for subchunk in self.subchunks:
+      if subchunk is None:
+        continue
       for x in range(16):
         for y in range(16):
           for z in range(16):
