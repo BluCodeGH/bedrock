@@ -18,8 +18,9 @@ class World:
     self.db = ldb.open(self.path)
     return self
 
-  def __exit__(self, *args):
-    self.save()
+  def __exit__(self, exceptionType, exception, tb):
+    if exceptionType is None:
+      self.save()
     ldb.close(self.db)
     return False
 
@@ -80,7 +81,7 @@ class Chunk:
       version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
       if version != 10:
-        raise NotImplementedError("Unexpected chunk version {}.".format(version))
+        raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
     except KeyError:
       raise ValueError("Chunk at {}, {} does not exist.".format(self.x, self.z))
     return version
@@ -162,10 +163,10 @@ class SubChunk:
       data = ldb.get(db, key)
       self.version, data = data[0], data[1:]
       if self.version != 8:
-        raise NotImplementedError("Unsupported subchunk version: {}".format(self.version))
+        raise NotImplementedError("Unsupported subchunk version {} at {} {}/{}".format(self.version, x, z, y))
       numStorages, data = data[0], data[1:]
       if numStorages != 1: # Maybe used for liquids
-        raise NotImplementedError("Unexpected number of storages: {}".format(numStorages))
+        raise NotImplementedError("Unexpected number of storages {} at {} {}/{}".format(numStorages, x, z, y))
 
       blocks, data = self._loadBlocks(data)
       palette = self._loadPalette(data)
@@ -228,7 +229,7 @@ class SubChunk:
         bitsPerBlock = bits
         break
     else:
-      raise NotImplementedError("Too many bits per block needed ({})".format(bitsPerBlock))
+      raise NotImplementedError("Too many bits per block needed {} at {} {}/{}".format(bitsPerBlock, self.x, self.z, self.y))
     blocksPerWord = 32 // bitsPerBlock
     numWords = - (-4096 // blocksPerWord)
     data = struct.pack("<B", bitsPerBlock << 1)
