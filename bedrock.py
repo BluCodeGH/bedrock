@@ -79,7 +79,7 @@ class Chunk:
     try:
       version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
-      if version != 7:
+      if version != 10:
         raise NotImplementedError("Unexpected chunk version {}.".format(version))
     except KeyError:
       raise ValueError("Chunk at {}, {} does not exist.".format(self.x, self.z))
@@ -204,10 +204,10 @@ class SubChunk:
     return palette
 
   def getBlock(self, x, y, z):
-    return self.blocks[x,y,z]
+    return self.blocks[x, y, z]
 
   def setBlock(self, x, y, z, block):
-    self.blocks[x,y,z] = block
+    self.blocks[x, y, z] = block
 
   def save(self, db):
     data = struct.pack("<BB", self.version, 1)
@@ -223,6 +223,12 @@ class SubChunk:
   # Compact blockIDs bitwise. See _loadBlocks for details.
   def _saveBlocks(self, paletteSize, blockIDs):
     bitsPerBlock = max(int(np.ceil(np.log2(paletteSize))), 1)
+    for bits in [1, 2, 3, 4, 5, 6, 8, 16]:
+      if bits >= bitsPerBlock:
+        bitsPerBlock = bits
+        break
+    else:
+      raise NotImplementedError("Too many bits per block needed ({})".format(bitsPerBlock))
     blocksPerWord = 32 // bitsPerBlock
     numWords = - (-4096 // blocksPerWord)
     data = struct.pack("<B", bitsPerBlock << 1)
