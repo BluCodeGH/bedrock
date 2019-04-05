@@ -31,21 +31,21 @@ class World:
       self.chunks[(x, z)] = chunk
     return chunk
 
-  def getBlock(self, x, y, z):
+  def getBlock(self, x, y, z, layer=0):
     cx = x // 16
     x %= 16
     cz = z // 16
     z %= 16
     chunk = self.getChunk(cx, cz)
-    return chunk.getBlock(x, y, z)
+    return chunk.getBlock(x, y, z, layer)
 
-  def setBlock(self, x, y, z, block):
+  def setBlock(self, x, y, z, block, layer):
     cx = x // 16
     x %= 16
     cz = z // 16
     z %= 16
     chunk = self.getChunk(cx, cz)
-    return chunk.setBlock(x, y, z, block)
+    return chunk.setBlock(x, y, z, block, layer)
 
   def save(self):
     for chunk in self.chunks.values():
@@ -107,17 +107,17 @@ class Chunk:
       z = nbtData.pop("z").payload
       self.getBlock(x % 16, y, z % 16).nbt = nbtData
 
-  def getBlock(self, x, y, z):
-    if y // 16 + 1 > len(self.subchunks):
+  def getBlock(self, x, y, z, layer=0):
+    if y // 16 + 1 > len(self.subchunks) or self.subchunks[y // 16] is None:
       return None
-    return self.subchunks[y // 16].getBlock(x, y % 16, z)
+    return self.subchunks[y // 16].getBlock(x, y % 16, z, layer)
 
-  def setBlock(self, x, y, z, block):
+  def setBlock(self, x, y, z, block, layer=0):
     while y // 16 + 1 > len(self.subchunks):
       self.subchunks.append(SubChunk.empty(self.x, self.z, len(self.subchunks)))
     if self.subchunks[y // 16] is None:
       self.subchunks[y // 16] = SubChunk.empty(self.x, self.z, y // 16)
-    self.subchunks[y // 16].setBlock(x, y % 16, z, block)
+    self.subchunks[y // 16].setBlock(x, y % 16, z, block, layer)
 
   def save(self, db):
     version = struct.pack("<B", self.version)
@@ -165,18 +165,18 @@ class SubChunk:
       if self.version != 8:
         raise NotImplementedError("Unsupported subchunk version {} at {} {}/{}".format(self.version, x, z, y))
       numStorages, data = data[0], data[1:]
-      if numStorages != 1: # Maybe used for liquids
-        raise NotImplementedError("Unexpected number of storages {} at {} {}/{}".format(numStorages, x, z, y))
 
-      blocks, data = self._loadBlocks(data)
-      palette = self._loadPalette(data)
+      self.blocks = []
+      for i in range(numStorages):
+        blocks, data = self._loadBlocks(data)
+        palette, data = self._loadPalette(data)
 
-      self.blocks = np.empty(4096, dtype=Block) # Prepare with correct dtype
-      for i, block in enumerate(blocks):
-        block = palette[block]
-        self.blocks[i] = Block(block["name"].payload, block["val"].payload) # .payload to get actual val
+        self.blocks.append(np.empty(4096, dtype=Block)) # Prepare with correct dtype
+        for j, block in enumerate(blocks):
+          block = palette[block]
+          self.blocks[i][j] = Block(block["name"].payload, block["val"].payload) # .payload to get actual val
 
-      self.blocks = self.blocks.reshape(16, 16, 16).swapaxes(1, 2) # Y and Z saved in an inverted order
+        self.blocks[i] = self.blocks[i].reshape(16, 16, 16).swapaxes(1, 2) # Y and Z saved in an inverted order
 
   # These arent actual blocks, just ids pointing to the palette.
   def _loadBlocks(self, data):
@@ -202,21 +202,26 @@ class SubChunk:
     palette = []
     for _ in range(palletLen):
       palette.append(nbt.decode(dr))
-    return palette
+    return palette, data[dr.idx:]
 
-  def getBlock(self, x, y, z):
-    return self.blocks[x, y, z]
+  def getBlock(self, x, y, z, layer=0):
+    if layer >= len(self.blocks):
+      raise ValueError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
+    return self.blocks[layer][x, y, z]
 
-  def setBlock(self, x, y, z, block):
-    self.blocks[x, y, z] = block
+  def setBlock(self, x, y, z, block, layer=0):
+    if layer >= len(self.blocks):
+      raise ValueError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
+    self.blocks[layer][x, y, z] = block
 
   def save(self, db):
     data = struct.pack("<BB", self.version, 1)
-    palette, blockIDs = self._savePalette()
-    data += self._saveBlocks(len(palette), blockIDs)
-    data += struct.pack("<I", len(palette))
-    for block in palette:
-      data += nbt.encode(block)
+    for i in range(len(self.blocks)):
+      palette, blockIDs = self._savePalette(i)
+      data += self._saveBlocks(len(palette), blockIDs)
+      data += struct.pack("<I", len(palette))
+      for block in palette:
+        data += nbt.encode(block)
 
     key = struct.pack("<iicB", self.x, self.z, b'/', self.y)
     ldb.put(db, key, data)
@@ -244,8 +249,8 @@ class SubChunk:
     return data
 
   # Make a palette, and get the block ids at the same time
-  def _savePalette(self):
-    blocks = self.blocks.swapaxes(1, 2).reshape(4096) # Y and Z saved in a inverted order
+  def _savePalette(self, layer):
+    blocks = self.blocks[layer].swapaxes(1, 2).reshape(4096) # Y and Z saved in a inverted order
     blockIDs = np.empty(4096, dtype=np.uint32)
     palette = []
     for i, block in enumerate(blocks):
@@ -260,7 +265,7 @@ class SubChunk:
   def empty(cls, x, z, y):
     subchunk = cls(None, x, z, y)
     subchunk.version = 8
-    subchunk.blocks = np.full((16, 16, 16), Block("minecraft:air"), dtype=Block)
+    subchunk.blocks = [np.full((16, 16, 16), Block("minecraft:air"), dtype=Block)]
     return subchunk
 
 # Generic block storage.
