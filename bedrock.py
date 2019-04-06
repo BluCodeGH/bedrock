@@ -154,6 +154,7 @@ class Chunk:
 # Handles the blocks and block palette format.
 class SubChunk:
   def __init__(self, db, x, z, y):
+    self.dirty = False
     self.x = x
     self.z = z
     self.y = y
@@ -213,18 +214,20 @@ class SubChunk:
     if layer >= len(self.blocks):
       raise ValueError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
     self.blocks[layer][x, y, z] = block
+    self.dirty = True
 
-  def save(self, db):
-    data = struct.pack("<BB", self.version, 1)
-    for i in range(len(self.blocks)):
-      palette, blockIDs = self._savePalette(i)
-      data += self._saveBlocks(len(palette), blockIDs)
-      data += struct.pack("<I", len(palette))
-      for block in palette:
-        data += nbt.encode(block)
+  def save(self, db, force=False):
+    if self.dirty or force:
+      data = struct.pack("<BB", self.version, 1)
+      for i in range(len(self.blocks)):
+        palette, blockIDs = self._savePalette(i)
+        data += self._saveBlocks(len(palette), blockIDs)
+        data += struct.pack("<I", len(palette))
+        for block in palette:
+          data += nbt.encode(block)
 
-    key = struct.pack("<iicB", self.x, self.z, b'/', self.y)
-    ldb.put(db, key, data)
+      key = struct.pack("<iicB", self.x, self.z, b'/', self.y)
+      ldb.put(db, key, data)
 
   # Compact blockIDs bitwise. See _loadBlocks for details.
   def _saveBlocks(self, paletteSize, blockIDs):
@@ -253,12 +256,14 @@ class SubChunk:
     blocks = self.blocks[layer].swapaxes(1, 2).reshape(4096) # Y and Z saved in a inverted order
     blockIDs = np.empty(4096, dtype=np.uint32)
     palette = []
+    mapping = {}
     for i, block in enumerate(blocks):
       # Generate the palette nbt for the given block
-      block = nbt.TAG_Compound("", [nbt.TAG_String("name", block.name), nbt.TAG_Short("val", block.dv)])
-      if block not in palette:
-        palette.append(block)
-      blockIDs[i] = palette.index(block)
+      short = (block.name, block.dv)
+      if short not in mapping:
+        palette.append(nbt.TAG_Compound("", [nbt.TAG_String("name", block.name), nbt.TAG_Short("val", block.dv)]))
+        mapping[short] = len(palette) - 1
+      blockIDs[i] = mapping[short]
     return palette, blockIDs
 
   @classmethod
@@ -270,6 +275,7 @@ class SubChunk:
 
 # Generic block storage.
 class Block:
+  __slots__ = ["name", "dv", "nbt"]
   def __init__(self, name, dv=0, nbtData=None):
     self.name = name
     self.dv = dv
