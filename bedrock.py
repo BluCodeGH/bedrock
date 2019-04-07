@@ -39,7 +39,7 @@ class World:
     chunk = self.getChunk(cx, cz)
     return chunk.getBlock(x, y, z, layer)
 
-  def setBlock(self, x, y, z, block, layer):
+  def setBlock(self, x, y, z, block, layer=0):
     cx = x // 16
     x %= 16
     cz = z // 16
