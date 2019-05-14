@@ -32,16 +32,19 @@ class DataReader:
 # Allows for easy sequential writing of binary data.
 class DataWriter:
   def __init__(self):
-    self.data = b""
+    self.data = []
 
   def put(self, key, *data):
     key = "<{}".format(key)
-    self.data += struct.pack(key, *data)
+    self.data.append(struct.pack(key, *data))
 
   def putString(self, string):
     string = string.encode("utf-8")
     self.put("h", len(string))
-    self.data += struct.pack("<{}s".format(len(string)), string)
+    self.data.append(struct.pack("<{}s".format(len(string)), string))
+
+  def get(self):
+    return b"".join(self.data)
 
   def __repr__(self):
     return str(self.data)
@@ -74,21 +77,21 @@ class TAG:
   def __repr__(self):
     return "{}-{}:{}".format(self.__class__.__name__, self.name, self.payload)
 
-def TAG_Generator(ID, fmt):
-  def decode(self, dataReader):
+def TAG_Generator(ID, fmt, name):
+  def _decode(self, dataReader):
     return dataReader.pop(fmt)
-  def encode(self, dataWriter):
+  def _encode(self, dataWriter):
     return dataWriter.put(fmt, self.payload)
-  return type("TAG_{}".format(ID), (TAG,), {"ID": ID, "decode": decode, "encode": encode})
+  return type("TAG_{}".format(name), (TAG,), {"ID": ID, "decode": _decode, "encode": _encode})
 
 tags = [] # Need to pre define tags for the later classes.
 
-TAG_Byte = TAG_Generator(1, "b")
-TAG_Short = TAG_Generator(2, "h")
-TAG_Int = TAG_Generator(3, "i")
-TAG_Long = TAG_Generator(4, "q")
-TAG_Float = TAG_Generator(5, "f")
-TAG_Double = TAG_Generator(6, "d")
+TAG_Byte = TAG_Generator(1, "b", "Byte")
+TAG_Short = TAG_Generator(2, "h", "Short")
+TAG_Int = TAG_Generator(3, "i", "Int")
+TAG_Long = TAG_Generator(4, "q", "Long")
+TAG_Float = TAG_Generator(5, "f", "Float")
+TAG_Double = TAG_Generator(6, "d", "Double")
 
 # Similar to TAG_List, except the type of tag is not specified, as we know it is a byte.
 class TAG_Byte_Array(TAG):
@@ -197,19 +200,19 @@ class TAG_Long_Array(TAG):
     for item in self.payload:
       item.encode(dataWriter)
 
-tags = [ None,
-         TAG_Byte,
-         TAG_Short,
-         TAG_Int,
-         TAG_Long,
-         TAG_Float,
-         TAG_Double,
-         TAG_Byte_Array,
-         TAG_String,
-         TAG_List,
-         TAG_Compound,
-         TAG_Int_Array,
-         TAG_Long_Array ]
+tags = [None,
+        TAG_Byte,
+        TAG_Short,
+        TAG_Int,
+        TAG_Long,
+        TAG_Float,
+        TAG_Double,
+        TAG_Byte_Array,
+        TAG_String,
+        TAG_List,
+        TAG_Compound,
+        TAG_Int_Array,
+        TAG_Long_Array]
 
 def decode(dataReader):
   tagID = dataReader.pop("b")
@@ -219,8 +222,10 @@ def decode(dataReader):
   raise NotImplementedError("Tag {} not implemented.".format(tagID))
 
 def encode(toEncode, dataWriter=None):
+  new = not dataWriter
   dataWriter = dataWriter or DataWriter()
   dataWriter.put("b", toEncode.ID)
   dataWriter.putString(toEncode.name)
   toEncode.encode(dataWriter)
-  return dataWriter.data
+  if new:
+    return dataWriter.get()

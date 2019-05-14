@@ -74,13 +74,14 @@ class Chunk:
         self.subchunks.append(None)
 
     self._loadTileEntities(db)
+    self.entities = self._loadEntities(db)
 
   # Version is simply a stored value.
   def _loadVersion(self, db):
     try:
       version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
-      if version != 10:
+      if version not in [10, 13, 14]:
         raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
     except KeyError:
       raise ValueError("Chunk at {}, {} does not exist.".format(self.x, self.z))
@@ -107,6 +108,17 @@ class Chunk:
       z = nbtData.pop("z").payload
       self.getBlock(x % 16, y, z % 16).nbt = nbtData
 
+  def _loadEntities(self, db):
+    try:
+      data = ldb.get(db, self.keyBase + b"2")
+    except KeyError:
+      return []
+    data = nbt.DataReader(data)
+    entities = []
+    while not data.finished():
+      entities.append(nbt.decode(data))
+    return entities
+
   def getBlock(self, x, y, z, layer=0):
     if y // 16 + 1 > len(self.subchunks) or self.subchunks[y // 16] is None:
       return None
@@ -128,6 +140,7 @@ class Chunk:
         continue
       subchunk.save(db)
     self._saveTileEntities(db)
+    self._saveEntities(db)
 
   def _save2D(self, db):
     pass
@@ -146,7 +159,13 @@ class Chunk:
               block.nbt.add(nbt.TAG_Int("y", subchunk.y * 16 + y))
               block.nbt.add(nbt.TAG_Int("z", subchunk.z * 16 + z))
               nbt.encode(block.nbt, data)
-    ldb.put(db, self.keyBase + b"1", data.data)
+    ldb.put(db, self.keyBase + b"1", data.get())
+
+  def _saveEntities(self, db):
+    data = nbt.DataWriter()
+    for entity in self.entities:
+      nbt.encode(entity, data)
+    ldb.put(db, self.keyBase + b"2", data.get())
 
   def __repr__(self):
     return "Chunk {} {}: {} subchunks".format(self.x, self.z, len(self.subchunks))
@@ -288,25 +307,32 @@ class Block:
 class CommandBlock(Block):
   nameMap = {"I": "command_block", "C": "chain_command_block", "R": "repeating_command_block"}
   dMap = {"d": 0, "u": 1, "-z": 2, "+z": 3, "-x": 4, "+x": 5}
-  def __init__(self, cmd="", hover="", block="I", d="u", cond=False, redstone=False):
+  def __init__(self, cmd="", hover="", block="I", d="u", cond=False, redstone=False, time=0, first=False):
     name = "minecraft:" + self.nameMap[block]
     dv = self.dMap[d]
     if cond:
       dv += 8
     nbtData = nbt.TAG_Compound("", [])
+    nbtData.add(nbt.TAG_Byte("auto", int(not redstone)))
     nbtData.add(nbt.TAG_String("Command", cmd))
     nbtData.add(nbt.TAG_String("CustomName", hover))
-    nbtData.add(nbt.TAG_Byte("TrackOutput", 1))
-    nbtData.add(nbt.TAG_Int("Version", 8))
-    nbtData.add(nbt.TAG_Byte("auto", int(not redstone)))
+    nbtData.add(nbt.TAG_Byte("powered", int(block == "R" and not redstone)))
+    if time == 0 and not first:
+      nbtData.add(nbt.TAG_Int("Version", 9))
+      nbtData.add(nbt.TAG_Byte("ExecuteOnFirstTick", int(first)))
+      nbtData.add(nbt.TAG_Int("TickDelay", time))
+    else:
+      nbtData.add(nbt.TAG_Int("Version", 8))
+
+    nbtData.add(nbt.TAG_Byte("conditionMet", 0))
     nbtData.add(nbt.TAG_String("id", "CommandBlock"))
     nbtData.add(nbt.TAG_Byte("isMovable", 1))
-    nbtData.add(nbt.TAG_Byte("powered", 0))
     nbtData.add(nbt.TAG_Int("LPCommandMode", 0)) # Not sure what these LPModes do. This works.
     nbtData.add(nbt.TAG_Byte("LPConditionalMode", 0))
     nbtData.add(nbt.TAG_Byte("LPRedstoneMode", 0))
     nbtData.add(nbt.TAG_Long("LastExecution", 0))
     nbtData.add(nbt.TAG_String("LastOutput", ""))
-    nbtData.add(nbt.TAG_List("LastOutputParams", [nbt.TAG_String(n, str(n)) for n in range(3)]))
+    nbtData.add(nbt.TAG_List("LastOutputParams", []))
     nbtData.add(nbt.TAG_Int("SuccessCount", 0))
+    nbtData.add(nbt.TAG_Byte("TrackOutput", 1))
     super().__init__(name, dv, nbtData)
