@@ -175,6 +175,13 @@ def put(db, key, val):
   ldb.leveldb_writeoptions_destroy(wo)
   _checkError(error)
 
+def delete(db, key):
+  wo = ldb.leveldb_writeoptions_create()
+  error = ctypes.POINTER(ctypes.c_char)()
+  ldb.leveldb_delete(db, wo, key, len(key), ctypes.byref(error))
+  ldb.leveldb_writeoptions_destroy(wo)
+  _checkError(error)
+
 def iterate(db, start=None, end=None):
   ro = ldb.leveldb_readoptions_create()
   it = ldb.leveldb_create_iterator(db, ro)
