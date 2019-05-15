@@ -84,7 +84,7 @@ class Chunk:
       if version not in [10, 13, 14]:
         raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
     except KeyError:
-      raise ValueError("Chunk at {}, {} does not exist.".format(self.x, self.z))
+      raise KeyError("Chunk at {}, {} does not exist.".format(self.x, self.z))
     return version
 
   # Load heightmap (seemingly useless) and biome info
@@ -226,12 +226,12 @@ class SubChunk:
 
   def getBlock(self, x, y, z, layer=0):
     if layer >= len(self.blocks):
-      raise ValueError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
+      raise KeyError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
     return self.blocks[layer][x, y, z]
 
   def setBlock(self, x, y, z, block, layer=0):
     if layer >= len(self.blocks):
-      raise ValueError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
+      raise KeyError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
     self.blocks[layer][x, y, z] = block
     self.dirty = True
 
