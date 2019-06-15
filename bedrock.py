@@ -318,11 +318,11 @@ class CommandBlock(Block):
     nbtData.add(nbt.TAG_String("CustomName", hover))
     nbtData.add(nbt.TAG_Byte("powered", int(block == "R" and not redstone)))
     if time == 0 and not first:
+      nbtData.add(nbt.TAG_Int("Version", 8))
+    else:
       nbtData.add(nbt.TAG_Int("Version", 9))
       nbtData.add(nbt.TAG_Byte("ExecuteOnFirstTick", int(first)))
       nbtData.add(nbt.TAG_Int("TickDelay", time))
-    else:
-      nbtData.add(nbt.TAG_Int("Version", 8))
 
     nbtData.add(nbt.TAG_Byte("conditionMet", 0))
     nbtData.add(nbt.TAG_String("id", "CommandBlock"))
