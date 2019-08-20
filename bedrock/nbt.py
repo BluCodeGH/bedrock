@@ -20,7 +20,11 @@ class DataReader:
     size = self.pop("h")
     popped = struct.unpack("<{}s".format(size), self.data[self.idx:self.idx + size])[0]
     self.idx += size
-    return popped.decode("utf-8")
+    try:
+      popped = popped.decode("utf-8")
+    except UnicodeDecodeError:
+      pass
+    return popped
 
   # Useful when dealing with an unknown number of compound tags back to back.
   def finished(self):
@@ -39,7 +43,8 @@ class DataWriter:
     self.data.append(struct.pack(key, *data))
 
   def putString(self, string):
-    string = string.encode("utf-8")
+    if not isinstance(string, bytes):
+      string = string.encode("utf-8")
     self.put("h", len(string))
     self.data.append(struct.pack("<{}s".format(len(string)), string))
 

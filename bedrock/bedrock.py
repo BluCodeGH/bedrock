@@ -3,8 +3,8 @@
 import struct
 import os.path
 import numpy as np
-import bedrock.leveldb as ldb
-import bedrock.nbt as nbt
+from . import leveldb as ldb
+from . import nbt
 
 # Handles chunk loading and mapping blocks to chunks.
 class World:
@@ -81,7 +81,7 @@ class Chunk:
     try:
       version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
-      if version not in [10, 13, 14]:
+      if version not in [10, 13, 14, 15]:
         raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
     except KeyError:
       raise KeyError("Chunk at {}, {} does not exist.".format(self.x, self.z))
