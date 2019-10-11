@@ -76,6 +76,9 @@ class TAG:
         return item
     raise KeyError("{} not found in {}".format(name, self.payload))
 
+  def __getattr__(self, name):
+    return self.__getitem__(name)
+
   def __eq__(self, other):
     return self.name == other.name and self.payload == other.payload and self.ID == other.ID
 
