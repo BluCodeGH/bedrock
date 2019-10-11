@@ -175,6 +175,16 @@ def put(db, key, val):
   ldb.leveldb_writeoptions_destroy(wo)
   _checkError(error)
 
+def putBatch(db, data):
+  batch = ldb.leveldb_writebatch_create()
+  for k, v in data.items():
+    ldb.leveldb_writebatch_put(batch, k, len(k), v, len(v))
+  wo = ldb.leveldb_writeoptions_create()
+  error = ctypes.POINTER(ctypes.c_char)()
+  ldb.leveldb_write(db, wo, batch, ctypes.byref(error))
+  ldb.leveldb_writeoptions_destroy(wo)
+  _checkError(error)
+
 def delete(db, key):
   wo = ldb.leveldb_writeoptions_create()
   error = ctypes.POINTER(ctypes.c_char)()

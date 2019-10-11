@@ -106,7 +106,11 @@ class Chunk:
       x = nbtData.pop("x").payload # We add back theses with the correct value on save, they are important.
       y = nbtData.pop("y").payload
       z = nbtData.pop("z").payload
-      self.getBlock(x % 16, y, z % 16).nbt = nbtData
+      block = self.getBlock(x % 16, y, z % 16)
+      if not block:
+        print("Warning: Cannot apply nbt to block at {} {} {} since it does not exist.".format(x, y, z))
+        continue
+      block.nbt = nbtData
 
   def _loadEntities(self, db):
     try:
@@ -198,8 +202,8 @@ class SubChunk:
         for j, block in enumerate(blocks):
           block = palette[block]
           try: # 1.13 format
-            if block["version"].payload != 17629200:
-              raise NotImplementedError("Unexpected block version {}".format(block["version"].payload))
+            #if block["version"].payload != 17629200:
+            #  raise NotImplementedError("Unexpected block version {}".format(block["version"].payload))
             self.blocks[i][j] = Block(block["name"].payload, block["states"].payload) # .payload to get actual val
           except KeyError: # 1.12 format
             self.blocks[i][j] = Block(block["name"].payload, block["val"].payload) # .payload to get actual val
@@ -228,7 +232,8 @@ class SubChunk:
     dr = nbt.DataReader(data)
     palette = []
     for _ in range(palletLen):
-      palette.append(nbt.decode(dr))
+      block = nbt.decode(dr)
+      palette.append(block)
     return palette, data[dr.idx:]
 
   def getBlock(self, x, y, z, layer=0):
