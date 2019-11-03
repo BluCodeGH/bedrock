@@ -35,7 +35,7 @@ print("Done!")
 `block.nbt`
 
 ### CommandBlock
-`CommandBlock(command="", hoverText="", blockType="I", direction="u", conditional=False, needsRedstone=False)`
+`CommandBlock(command="", hoverText="", blockType="I", direction="u", conditional=False, needsRedstone=False, tickDelay=0, executeOnFirstTick=False)`
 
 `blockType` can be one of `I`, `C`, `R`. `direction` can be one of `u`, `d`, `+x`, `-x`, `+z`, `-z`.
 
