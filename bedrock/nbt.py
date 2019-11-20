@@ -94,7 +94,7 @@ def TAG_Generator(ID, fmt, name):
 
 tags = [] # Need to pre define tags for the later classes.
 
-TAG_Byte = TAG_Generator(1, "b", "Byte")
+TAG_Byte = TAG_Generator(1, "B", "Byte")
 TAG_Short = TAG_Generator(2, "h", "Short")
 TAG_Int = TAG_Generator(3, "i", "Int")
 TAG_Long = TAG_Generator(4, "q", "Long")

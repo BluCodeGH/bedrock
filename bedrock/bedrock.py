@@ -249,7 +249,7 @@ class SubChunk:
 
   def save(self, db, force=False):
     if self.dirty or force:
-      data = struct.pack("<BB", self.version, 1)
+      data = struct.pack("<BB", self.version, len(self.blocks))
       for i in range(len(self.blocks)):
         palette, blockIDs = self._savePalette(i)
         data += self._saveBlocks(len(palette), blockIDs)

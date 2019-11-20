@@ -5,7 +5,7 @@ The simple, easy to use python interface for Minecraft Bedrock worlds you've bee
 ```python
 import bedrock
 
-with bedrock.World(path-to-save) as world:
+with bedrock.World(path_to_save) as world:
   block = bedrock.Block("minecraft:stone") # Name must include `minecraft:`
   world.setBlock(0, 0, 0, block)
   block = bedrock.Block("minecraft:stone", 2) # Data value
@@ -21,16 +21,17 @@ print("Done!")
 ### World
 `World(path)`
 
-`world.getBlock(x, y, z)`
+`world.getBlock(x, y, z, layer=0)`
 
-`world.setBlock(x, y, z, block)`
+`world.setBlock(x, y, z, block, layer=0)`
 
 ### Block
-`Block(name, dv=0, nbt=None)`
+`Block(name, properties=[], nbt=None)`
 
 `block.name`
 
-`block.dv`
+`block.properties`
+Block properties are either a numerical data value or a list of bedrock.nbt tags that will become the block's nbt compound tag.
 
 `block.nbt`
 
