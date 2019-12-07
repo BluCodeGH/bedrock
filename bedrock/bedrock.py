@@ -147,7 +147,9 @@ class Chunk:
     self._saveEntities(db)
 
   def _save2D(self, db):
-    pass
+    data = struct.pack("<" + "H" * 16 * 16, *self.hMap)
+    data += struct.pack("B" * 16 * 16, *self.biomes)
+    ldb.put(db, self.keyBase + b'-', data)
 
   def _saveTileEntities(self, db):
     data = nbt.DataWriter()
