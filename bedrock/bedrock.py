@@ -54,6 +54,19 @@ class World:
   def iterKeys(self, start=None, end=None):
     yield from ldb.iterate(self.db, start, end)
 
+  def iterChunks(self, start=None, end=None):
+    for k, _ in ldb.iterate(self.db):
+      if len(k) == 9 and k[-1] == ord("v"):
+        x, z = struct.unpack("<ii", k[:8])
+        if start and (x < start[0] or x >= end[0]):
+          continue
+        if end and (z < start[1] or z >= end[1]):
+          continue
+        try:
+          yield self.getChunk(x, z)
+        except Exception as e:
+          print("Error: Couldn't load chunk at {} {}: {}".format(x, z, e))
+
 # Handles biomes and tile entities. Maps blocks to subchunks.
 class Chunk:
   def __init__(self, db, x, z):
@@ -81,7 +94,7 @@ class Chunk:
     try:
       version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
-      if version not in [10, 13, 14, 15]:
+      if version not in [10, 13, 14, 15, 18]:
         raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
     except KeyError:
       raise KeyError("Chunk at {}, {} does not exist.".format(self.x, self.z))
@@ -320,6 +333,11 @@ class Block:
     self.name = name
     self.properties = properties or []
     self.nbt = nbtData
+
+  def __eq__(self, other):
+    if not isinstance(other, Block):
+      return False
+    return self.name == other.name and self.properties == other.properties and self.nbt == other.nbt
 
   def __repr__(self):
     return "{} {}".format(self.name, self.properties)
