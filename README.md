@@ -13,7 +13,7 @@ with bedrock.World(path_to_save) as world:
   world.setBlock(0, 0, 0, block)
   block = bedrock.Block("minecraft:stone", 2) # Data value
   world.setBlock(0, 1, 0, block)
-  if world.getBlock(0, 2, 0).name = "minecraft:stone":
+  if world.getBlock(0, 2, 0).name == "minecraft:stone":
     print("More stone!")
 # Autosave on close.
 
