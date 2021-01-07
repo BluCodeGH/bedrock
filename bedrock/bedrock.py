@@ -92,9 +92,12 @@ class Chunk:
   # Version is simply a stored value.
   def _loadVersion(self, db):
     try:
-      version = ldb.get(db, self.keyBase + b"v")
+      try:
+        version = ldb.get(db, self.keyBase + b",")
+      except KeyError:
+        version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
-      if version not in [10, 13, 14, 15, 18, 19]:
+      if version not in [10, 13, 14, 15, 18, 19, 21]:
         raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
     except KeyError:
       raise KeyError("Chunk at {}, {} does not exist.".format(self.x, self.z))
