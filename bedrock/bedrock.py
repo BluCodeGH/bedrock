@@ -76,10 +76,14 @@ class Chunk:
     self.keyBase = struct.pack("<ii", self.x, self.z)
 
     self.version = self._loadVersion(db)
-    self.hMap, self.biomes = self._load2D(db)
+    self.cavesAndCliffs = self.version >= 25
+    if not self.cavesAndCliffs:
+      self.hMap, self.biomes = self._load2D(db)
+    else:
+      self.hMap, self.biomes = None, None
 
     self.subchunks = []
-    for i in range(16):
+    for i in range(24 if self.cavesAndCliffs else 16):
       try:
         self.subchunks.append(SubChunk(db, self.x, self.z, i)) #Pass off processing to the subchunk class
       #Supposedly if a subchunk exists then all the subchunks below it exist. This is not the case.
@@ -97,7 +101,7 @@ class Chunk:
       except KeyError:
         version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
-      if version not in [10, 13, 14, 15, 18, 19, 21]:
+      if version not in [10, 13, 14, 15, 18, 19, 21, 22, 25]:
         raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
     except KeyError:
       raise KeyError("Chunk at {}, {} does not exist.".format(self.x, self.z))
@@ -140,11 +144,15 @@ class Chunk:
     return entities
 
   def getBlock(self, x, y, z, layer=0):
+    if self.cavesAndCliffs:
+      y += 64
     if y // 16 + 1 > len(self.subchunks) or self.subchunks[y // 16] is None:
       return None
     return self.subchunks[y // 16].getBlock(x, y % 16, z, layer)
 
   def setBlock(self, x, y, z, block, layer=0):
+    if self.cavesAndCliffs:
+      y += 64
     while y // 16 + 1 > len(self.subchunks):
       self.subchunks.append(SubChunk.empty(self.x, self.z, len(self.subchunks)))
     if self.subchunks[y // 16] is None:
@@ -153,8 +161,9 @@ class Chunk:
 
   def save(self, db):
     version = struct.pack("<B", self.version)
-    ldb.put(db, self.keyBase + b"v", version)
-    self._save2D(db)
+    ldb.put(db, self.keyBase + b",", version)
+    if not self.cavesAndCliffs:
+      self._save2D(db)
     for subchunk in self.subchunks:
       if subchunk is None:
         continue
@@ -344,6 +353,9 @@ class Block:
 
   def __repr__(self):
     return "{} {}".format(self.name, self.properties)
+
+  def __hash__(self):
+    return self.__repr__().__hash__()
 
 # Handles NBT generation for command blocks.
 class CommandBlock(Block):
