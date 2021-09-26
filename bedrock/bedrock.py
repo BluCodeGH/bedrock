@@ -56,7 +56,7 @@ class World:
 
   def iterChunks(self, start=None, end=None):
     for k, _ in ldb.iterate(self.db):
-      if len(k) == 9 and k[-1] == ord("v"):
+      if len(k) == 9 and k.endswith((b"v", b",")):
         x, z = struct.unpack("<ii", k[:8])
         if start and (x < start[0] or x >= end[0]):
           continue
