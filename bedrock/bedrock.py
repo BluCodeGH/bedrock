@@ -290,7 +290,7 @@ class SubChunk:
           data += nbt.encode(block)
 
       if self.version == 9:
-        data = self.y_db + data
+        data = self.y_db.to_bytes() + data
 
       key = struct.pack("<iicB", self.x, self.z, b'/', self.y)
       ldb.put(db, key, data)
