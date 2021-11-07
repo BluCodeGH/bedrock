@@ -222,6 +222,8 @@ class SubChunk:
 
       if self.version == 9:
         self.y_db, data = data[0], data[1:]
+      else:
+        self.y_db = None
 
       self.blocks = []
       for i in range(numStorages):
