@@ -216,9 +216,14 @@ class SubChunk:
       except KeyError:
         raise NotFoundError("Subchunk at {} {}/{} not found.".format(x, z, y))
       self.version, data = data[0], data[1:]
-      if self.version != 8:
+      if self.version not in [8, 9]:
         raise NotImplementedError("Unsupported subchunk version {} at {} {}/{}".format(self.version, x, z, y))
       numStorages, data = data[0], data[1:]
+
+      if self.version == 9:
+        self.y_db, data = data[0], data[1:]
+      else:
+        self.y_db = None
 
       self.blocks = []
       for i in range(numStorages):
@@ -283,6 +288,9 @@ class SubChunk:
         data += struct.pack("<I", len(palette))
         for block in palette:
           data += nbt.encode(block)
+
+      if self.version == 9:
+        data = struct.pack("B", self.y_db) + data
 
       key = struct.pack("<iicB", self.x, self.z, b'/', self.y)
       ldb.put(db, key, data)
