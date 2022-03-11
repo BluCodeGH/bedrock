@@ -1,9 +1,6 @@
 # bedrock
 The simple, easy to use python interface for Minecraft Bedrock worlds you've been waiting for.
 
-## bedrock is provided for non-commercial use
-If you would like to use it commercially, please contact me over discord at `BluCode#8160` and we can certainly work something out.
-
 ## Quickstart
 ```python
 import bedrock
