@@ -24,27 +24,27 @@ class World:
     ldb.close(self.db)
     return False
 
-  def getChunk(self, x, z):
-    chunk = self.chunks.get((x, z), None)
+  def getChunk(self, x, z, dimension):
+    chunk = self.chunks.get((x, z, dimension), None)
     if chunk is None:
-      chunk = Chunk(self.db, x, z)
-      self.chunks[(x, z)] = chunk
+      chunk = Chunk(self.db, x, z, dimension)
+      self.chunks[(x, z, dimension)] = chunk
     return chunk
 
-  def getBlock(self, x, y, z, layer=0):
+  def getBlock(self, x, y, z, dimension, layer=0):
     cx = x // 16
     x %= 16
     cz = z // 16
     z %= 16
-    chunk = self.getChunk(cx, cz)
+    chunk = self.getChunk(cx, cz, dimension)
     return chunk.getBlock(x, y, z, layer)
 
-  def setBlock(self, x, y, z, block, layer=0):
+  def setBlock(self, x, y, z, dimension, block, layer=0):
     cx = x // 16
     x %= 16
     cz = z // 16
     z %= 16
-    chunk = self.getChunk(cx, cz)
+    chunk = self.getChunk(cx, cz, dimension)
     return chunk.setBlock(x, y, z, block, layer)
 
   def save(self):
@@ -54,26 +54,46 @@ class World:
   def iterKeys(self, start=None, end=None):
     yield from ldb.iterate(self.db, start, end)
 
-  def iterChunks(self, start=None, end=None):
+  def iterChunks(self, dimension, start=None, end=None):
     for k, _ in ldb.iterate(self.db):
-      if len(k) == 9 and k.endswith((b"v", b",")):
-        x, z = struct.unpack("<ii", k[:8])
-        if start and (x < start[0] or x >= end[0]):
-          continue
-        if end and (z < start[1] or z >= end[1]):
-          continue
-        try:
-          yield self.getChunk(x, z)
-        except Exception as e:
-          print("Error: Couldn't load chunk at {} {}: {}".format(x, z, e))
+      if dimension == 0:
+        # Overworld
+        if len(k) == 9 and k.endswith((b"v", b",")):
+          x, z = struct.unpack("<ii", k[:8])
+          if start and (x < start[0] or x >= end[0]):
+            continue
+          if end and (z < start[1] or z >= end[1]):
+            continue
+          try:
+            yield self.getChunk(x, z, dimension)
+          except Exception as e:
+            print("Error: Couldn't load chunk at {} {} (Dim {}): {}".format(x, z, dimension, e))
+      else:
+        # Nether / The End
+        if len(k) == 13 and k.endswith((b"v", b",")):
+          x, z, dim = struct.unpack("<iii", k[:12])
+          if dim != dimension:
+            continue
+          if start and (x < start[0] or x >= end[0]):
+            continue
+          if end and (z < start[1] or z >= end[1]):
+            continue
+          try:
+            yield self.getChunk(x, z, dimension)
+          except Exception as e:
+            print("Error: Couldn't load chunk at {} {} (Dim {}): {}".format(x, z, dimension, e))
 
 # Handles biomes and tile entities. Maps blocks to subchunks.
 class Chunk:
-  def __init__(self, db, x, z):
+  def __init__(self, db, x, z, dimension):
     self.x = x
     self.z = z
+    self.dimension = dimension
     # Leveldb chunks are stored in a number of keys with the same prefix.
-    self.keyBase = struct.pack("<ii", self.x, self.z)
+    if self.dimension == 0:
+        self.keyBase = struct.pack("<ii", self.x, self.z)
+    else:
+        self.keyBase = struct.pack("<iii", self.x, self.z, self.dimension)
 
     self.version = self._loadVersion(db)
     self.cavesAndCliffs = self.version >= 25
@@ -85,7 +105,7 @@ class Chunk:
     self.subchunks = []
     for i in range(24 if self.cavesAndCliffs else 16):
       try:
-        self.subchunks.append(SubChunk(db, self.x, self.z, i)) #Pass off processing to the subchunk class
+        self.subchunks.append(SubChunk(db, self.x, self.z, self.dimension, i)) #Pass off processing to the subchunk class
       #Supposedly if a subchunk exists then all the subchunks below it exist. This is not the case.
       except NotFoundError:
         self.subchunks.append(None)
@@ -101,10 +121,10 @@ class Chunk:
       except KeyError:
         version = ldb.get(db, self.keyBase + b"v")
       version = struct.unpack("<B", version)[0]
-      if version not in [10, 13, 14, 15, 18, 19, 21, 22, 25]:
-        raise NotImplementedError("Unexpected chunk version {} at chunk {} {}.".format(version, self.x, self.z))
+      if version not in [10, 13, 14, 15, 18, 19, 21, 22, 25, 40]:
+        raise NotImplementedError("Unexpected chunk version {} at chunk {} {} (Dim {}).".format(version, self.x, self.z, self.dimension))
     except KeyError:
-      raise KeyError("Chunk at {}, {} does not exist.".format(self.x, self.z))
+      raise KeyError("Chunk at {}, {} (Dim {}) does not exist.".format(self.x, self.z, self.dimension))
     return version
 
   # Load heightmap (seemingly useless) and biome info
@@ -154,9 +174,9 @@ class Chunk:
     if self.cavesAndCliffs:
       y += 64
     while y // 16 + 1 > len(self.subchunks):
-      self.subchunks.append(SubChunk.empty(self.x, self.z, len(self.subchunks)))
+      self.subchunks.append(SubChunk.empty(self.x, self.z, self.dimension, len(self.subchunks)))
     if self.subchunks[y // 16] is None:
-      self.subchunks[y // 16] = SubChunk.empty(self.x, self.z, y // 16)
+      self.subchunks[y // 16] = SubChunk.empty(self.x, self.z, self.dimension, y // 16)
     self.subchunks[y // 16].setBlock(x, y % 16, z, block, layer)
 
   def save(self, db):
@@ -199,25 +219,29 @@ class Chunk:
     ldb.put(db, self.keyBase + b"2", data.get())
 
   def __repr__(self):
-    return "Chunk {} {}: {} subchunks".format(self.x, self.z, len(self.subchunks))
+    return "Chunk {} {} (Dim {}): {} subchunks".format(self.x, self.z, self.dimension, len(self.subchunks))
 
 # Handles the blocks and block palette format.
 class SubChunk:
-  def __init__(self, db, x, z, y):
+  def __init__(self, db, x, z, dimension, y):
     self.dirty = False
     self.x = x
     self.z = z
+    self.dimension = dimension
     self.y = y
     if db is not None: # For creating subchunks, there will be no DB.
       # Subchunks are stored as base key + subchunk key `/` + subchunk id (y level // 16)
-      key = struct.pack("<iicB", x, z, b'/', y)
+      if self.dimension == 0:
+        self.key = struct.pack("<iicB", x, z, b'/', y)
+      else:
+        self.key = struct.pack("<iiicB", x, z, dimension, b'/', y)
       try:
-        data = ldb.get(db, key)
+        data = ldb.get(db, self.key)
       except KeyError:
-        raise NotFoundError("Subchunk at {} {}/{} not found.".format(x, z, y))
+        raise NotFoundError("Subchunk at {} {} (Dim {})/{} not found.".format(x, z, dimension, y))
       self.version, data = data[0], data[1:]
       if self.version not in [8, 9]:
-        raise NotImplementedError("Unsupported subchunk version {} at {} {}/{}".format(self.version, x, z, y))
+        raise NotImplementedError("Unsupported subchunk version {} at {} {} (Dim {})/{}".format(self.version, x, z, dimension, y))
       numStorages, data = data[0], data[1:]
 
       if self.version == 9:
@@ -228,23 +252,36 @@ class SubChunk:
       self.blocks = []
       for i in range(numStorages):
         blocks, data = self._loadBlocks(data)
-        palette, data = self._loadPalette(data)
-
-        self.blocks.append(np.empty(4096, dtype=Block)) # Prepare with correct dtype
-        for j, block in enumerate(blocks):
-          block = palette[block]
-          try: # 1.13 format
-            #if block["version"].payload != 17629200:
-            #  raise NotImplementedError("Unexpected block version {}".format(block["version"].payload))
-            self.blocks[i][j] = Block(block["name"].payload, block["states"].payload) # .payload to get actual val
-          except KeyError: # 1.12 format
-            self.blocks[i][j] = Block(block["name"].payload, block["val"].payload) # .payload to get actual val
-        self.blocks[i] = self.blocks[i].reshape(16, 16, 16).swapaxes(1, 2) # Y and Z saved in an inverted order
+        if data:
+            palette, data = self._loadPalette(data)
+            self.blocks.append(np.empty(4096, dtype=Block)) # Prepare with correct dtype
+            for j, block in enumerate(blocks):
+              block = palette[block]
+              try: # 1.13 format
+                #if block["version"].payload != 17629200:
+                #  raise NotImplementedError("Unexpected block version {}".format(block["version"].payload))
+                self.blocks[i][j] = Block(block["name"].payload, block["states"].payload) # .payload to get actual val
+              except KeyError: # 1.12 format
+                self.blocks[i][j] = Block(block["name"].payload, block["val"].payload) # .payload to get actual val
+            self.blocks[i] = self.blocks[i].reshape(16, 16, 16).swapaxes(1, 2) # Y and Z saved in an inverted order
+        else:
+            # I *think* this means the whole subchunk is one type of block - commonly endstone
+            try: # 1.13 format
+                blocks = Block(blocks["name"].payload, blocks["states"].payload)
+            except KeyError: # 1.12 format
+                blocks = Block(blocks["name"].payload, blocks["val"].payload)
+            self.blocks.append(np.full(4096, blocks, dtype=Block))
+            self.blocks[i] = self.blocks[i].reshape(16, 16, 16)
 
   # These arent actual blocks, just ids pointing to the palette.
   def _loadBlocks(self, data):
     #Ignore LSB of data (its a flag) and get compacting level
     bitsPerBlock, data = data[0] >> 1, data[1:]
+    if bitsPerBlock == 0:
+        # I *think* this means the whole subchunk is one type of block - commonly endstone
+        dr = nbt.DataReader(data)
+        block = nbt.decode(dr)
+        return (block, None)
     blocksPerWord = 32 // bitsPerBlock # Word = 4 bytes, basis of compacting.
     numWords = - (-4096 // blocksPerWord) # Ceiling divide is inverted floor divide
 
@@ -270,12 +307,12 @@ class SubChunk:
 
   def getBlock(self, x, y, z, layer=0):
     if layer >= len(self.blocks):
-      raise KeyError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
+      raise KeyError("Subchunk {} {} (Dim {})/{} does not have a layer {}".format(self.x, self.z, self.dimension, self.y, layer))
     return self.blocks[layer][x, y, z]
 
   def setBlock(self, x, y, z, block, layer=0):
     if layer >= len(self.blocks):
-      raise KeyError("Subchunk {} {}/{} does not have a layer {}".format(self.x, self.z, self.y, layer))
+      raise KeyError("Subchunk {} {} (Dim {})/{} does not have a layer {}".format(self.x, self.z, self.dimension, self.y, layer))
     self.blocks[layer][x, y, z] = block
     self.dirty = True
 
@@ -292,8 +329,7 @@ class SubChunk:
       if self.version == 9:
         data = struct.pack("B", self.y_db) + data
 
-      key = struct.pack("<iicB", self.x, self.z, b'/', self.y)
-      ldb.put(db, key, data)
+      ldb.put(db, self.key, data)
 
   # Compact blockIDs bitwise. See _loadBlocks for details.
   def _saveBlocks(self, paletteSize, blockIDs):
@@ -303,7 +339,7 @@ class SubChunk:
         bitsPerBlock = bits
         break
     else:
-      raise NotImplementedError("Too many bits per block needed {} at {} {}/{}".format(bitsPerBlock, self.x, self.z, self.y))
+      raise NotImplementedError("Too many bits per block needed {} at {} {} (Dim {})/{}".format(bitsPerBlock, self.x, self.z, self.dimension, self.y))
     blocksPerWord = 32 // bitsPerBlock
     numWords = - (-4096 // blocksPerWord)
     data = struct.pack("<B", bitsPerBlock << 1)
@@ -340,8 +376,8 @@ class SubChunk:
     return palette, blockIDs
 
   @classmethod
-  def empty(cls, x, z, y):
-    subchunk = cls(None, x, z, y)
+  def empty(cls, x, z, dimension, y):
+    subchunk = cls(None, x, z, dimension, y)
     subchunk.version = 8
     subchunk.blocks = [np.full((16, 16, 16), Block("minecraft:air"), dtype=Block)]
     return subchunk

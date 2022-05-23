@@ -7,10 +7,10 @@ import bedrock
 
 with bedrock.World(path_to_save) as world:
   block = bedrock.Block("minecraft:stone") # Name must include `minecraft:`
-  world.setBlock(0, 0, 0, block)
+  world.setBlock(0, 0, 0, 0, block)
   block = bedrock.Block("minecraft:stone", 2) # Data value
-  world.setBlock(0, 1, 0, block)
-  if world.getBlock(0, 2, 0).name == "minecraft:stone":
+  world.setBlock(0, 1, 0, 0, block)
+  if world.getBlock(0, 2, 0, 0).name == "minecraft:stone":
     print("More stone!")
 # Autosave on close.
 
@@ -21,9 +21,9 @@ print("Done!")
 ### World
 `World(path)`
 
-`world.getBlock(x, y, z, layer=0)`
+`world.getBlock(x, y, z, dimension, layer=0)`
 
-`world.setBlock(x, y, z, block, layer=0)`
+`world.setBlock(x, y, z, dimension, block, layer=0)`
 
 ### Block
 `Block(name, properties=[], nbt=None)`
