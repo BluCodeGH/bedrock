@@ -21,9 +21,9 @@ print("Done!")
 ### World
 `World(path)`
 
-`world.getBlock(x, y, z, layer=0)`
+`world.getBlock(x, y, z, layer=0, dimension=0)`
 
-`world.setBlock(x, y, z, block, layer=0)`
+`world.setBlock(x, y, z, block, layer=0, dimension=0)`
 
 ### Block
 `Block(name, properties=[], nbt=None)`
