@@ -24,14 +24,14 @@ class World:
     ldb.close(self.db)
     return False
 
-  def getChunk(self, x, z, dimension):
+  def getChunk(self, x, z, dimension=0):
     chunk = self.chunks.get((x, z, dimension), None)
     if chunk is None:
       chunk = Chunk(self.db, x, z, dimension)
       self.chunks[(x, z, dimension)] = chunk
     return chunk
 
-  def getBlock(self, x, y, z, dimension, layer=0):
+  def getBlock(self, x, y, z, layer=0, dimension=0):
     cx = x // 16
     x %= 16
     cz = z // 16
@@ -39,7 +39,7 @@ class World:
     chunk = self.getChunk(cx, cz, dimension)
     return chunk.getBlock(x, y, z, layer)
 
-  def setBlock(self, x, y, z, dimension, block, layer=0):
+  def setBlock(self, x, y, z, block, layer=0, dimension=0):
     cx = x // 16
     x %= 16
     cz = z // 16
@@ -54,7 +54,7 @@ class World:
   def iterKeys(self, start=None, end=None):
     yield from ldb.iterate(self.db, start, end)
 
-  def iterChunks(self, dimension, start=None, end=None):
+  def iterChunks(self, start=None, end=None, dimension=0):
     for k, _ in ldb.iterate(self.db):
       if dimension == 0:
         # Overworld
@@ -85,7 +85,7 @@ class World:
 
 # Handles biomes and tile entities. Maps blocks to subchunks.
 class Chunk:
-  def __init__(self, db, x, z, dimension):
+  def __init__(self, db, x, z, dimension=0):
     self.x = x
     self.z = z
     self.dimension = dimension
@@ -105,7 +105,7 @@ class Chunk:
     self.subchunks = []
     for i in range(24 if self.cavesAndCliffs else 16):
       try:
-        self.subchunks.append(SubChunk(db, self.x, self.z, self.dimension, i)) #Pass off processing to the subchunk class
+        self.subchunks.append(SubChunk(db, self.x, self.z, i, self.dimension)) #Pass off processing to the subchunk class
       #Supposedly if a subchunk exists then all the subchunks below it exist. This is not the case.
       except NotFoundError:
         self.subchunks.append(None)
@@ -174,9 +174,9 @@ class Chunk:
     if self.cavesAndCliffs:
       y += 64
     while y // 16 + 1 > len(self.subchunks):
-      self.subchunks.append(SubChunk.empty(self.x, self.z, self.dimension, len(self.subchunks)))
+      self.subchunks.append(SubChunk.empty(self.x, self.z, len(self.subchunks), self.dimension))
     if self.subchunks[y // 16] is None:
-      self.subchunks[y // 16] = SubChunk.empty(self.x, self.z, self.dimension, y // 16)
+      self.subchunks[y // 16] = SubChunk.empty(self.x, self.z, y // 16, self.dimension)
     self.subchunks[y // 16].setBlock(x, y % 16, z, block, layer)
 
   def save(self, db):
@@ -223,12 +223,12 @@ class Chunk:
 
 # Handles the blocks and block palette format.
 class SubChunk:
-  def __init__(self, db, x, z, dimension, y):
+  def __init__(self, db, x, z, y, dimension=0):
     self.dirty = False
     self.x = x
     self.z = z
-    self.dimension = dimension
     self.y = y
+    self.dimension = dimension
     if db is not None: # For creating subchunks, there will be no DB.
       # Subchunks are stored as base key + subchunk key `/` + subchunk id (y level // 16)
       if self.dimension == 0:
@@ -376,8 +376,8 @@ class SubChunk:
     return palette, blockIDs
 
   @classmethod
-  def empty(cls, x, z, dimension, y):
-    subchunk = cls(None, x, z, dimension, y)
+  def empty(cls, x, z, y, dimension=0):
+    subchunk = cls(None, x, z, y, dimension)
     subchunk.version = 8
     subchunk.blocks = [np.full((16, 16, 16), Block("minecraft:air"), dtype=Block)]
     return subchunk
